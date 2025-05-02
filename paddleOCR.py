@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 ocr = PaddleOCR(use_angle_cls=True, lang='en')  # Load model
-img_path = './sampleImages/2.png'
+img_path = './sampleImages/5.png'
 
 # 1. Perform OCR
 results = ocr.ocr(img_path, cls=True)
@@ -40,8 +40,8 @@ for data in metadata_list:
 metadata_list.sort(key=lambda item: item['y'])
 
 # 5. Group into paragraphs using vertical threshold
-thresh = 25
-indent = 20
+thresh = 15
+indent = 10
 
 paragraphs = []
 current_para = []
@@ -106,7 +106,7 @@ for para in paragraphs:
 image_rgb = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
 
 # Show image with paragraph boxes
-plt.figure(figsize=(10, 10))
+plt.figure(figsize=(12, 10))
 plt.imshow(image_rgb)
 plt.title("Paragraph Bounding Boxes")
 plt.axis('off')
