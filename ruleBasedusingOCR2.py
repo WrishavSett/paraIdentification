@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 def load_image(path):
-    return Image.open(path).convert('RGB')
+    return Image.open(path).convert('RGB', use_gpu=False)
 
 def extract_metadata(results):
     lines = []

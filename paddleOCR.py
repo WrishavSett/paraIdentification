@@ -2,7 +2,7 @@ from paddleocr import PaddleOCR, draw_ocr
 import matplotlib.pyplot as plt
 from PIL import Image
 
-ocr = PaddleOCR(use_angle_cls=True, lang='en')  # Load model
+ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)  # Load model
 img_path = './sampleImages/5.png'
 
 # 1. Perform OCR
@@ -40,7 +40,7 @@ for data in metadata_list:
 metadata_list.sort(key=lambda item: item['y'])
 
 # 5. Group into paragraphs using vertical threshold
-thresh = 15
+thresh = 5
 indent = 10
 
 paragraphs = []

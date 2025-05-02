@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 # 1. Load OCR and image
-ocr = PaddleOCR(use_angle_cls=True, lang='en')
+ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
 img_path = './sampleImages/5.png'  # <- Change this to your actual image path
 image = Image.open(img_path).convert('RGB')
 results = ocr.ocr(img_path, cls=True)[0]
