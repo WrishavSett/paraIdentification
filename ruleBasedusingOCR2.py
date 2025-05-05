@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 def load_image(path):
-    return Image.open(path).convert('RGB', use_gpu=False)
+    return Image.open(path).convert('RGB')
 
 def extract_metadata(results):
     lines = []
@@ -115,7 +115,7 @@ def draw_paragraph_boxes(image, paragraphs, color=(255, 0, 0), thickness=2):
 
 # Main pipeline
 def detect_paragraphs(image_path, column_thresh=60, gap_factor=1.5):
-    ocr = PaddleOCR(use_angle_cls=True, lang='en')
+    ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
     image = load_image(image_path)
     results = ocr.ocr(image_path, cls=True)[0]
 
