@@ -4,16 +4,30 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-def load_image(path):
+
+# --- Image and OCR ---
+
+def load_image(path: str) -> Image.Image:
+    """Load an image and convert to RGB."""
     return Image.open(path).convert('RGB')
 
-def extract_metadata(results):
+
+def run_ocr(image_path: str, use_gpu: bool = False):
+    """Run PaddleOCR on the given image path."""
+    ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=use_gpu)
+    results = ocr.ocr(image_path, cls=True)[0]
+    return results
+
+
+# --- Metadata Processing ---
+
+def extract_metadata(results) -> list:
+    """Extract bounding box and text metadata from OCR results."""
     lines = []
     for box, (text, score) in results:
         if not text.strip():
             continue
-        x_coords = [pt[0] for pt in box]
-        y_coords = [pt[1] for pt in box]
+        x_coords, y_coords = zip(*box)
         x_min, x_max = min(x_coords), max(x_coords)
         y_min, y_max = min(y_coords), max(y_coords)
         lines.append({
@@ -26,74 +40,40 @@ def extract_metadata(results):
         })
     return lines
 
-def cluster_columns(lines, threshold=50):
+
+def cluster_columns(lines: list, threshold: int = 50) -> list:
+    """Group lines into columns based on horizontal proximity."""
     columns = []
     for line in sorted(lines, key=lambda l: l['x']):
-        added = False
         for col in columns:
             if abs(line['x'] - col['x']) < threshold:
                 col['lines'].append(line)
                 col['x'] = (col['x'] + line['x']) / 2  # update centroid
-                added = True
                 break
-        if not added:
+        else:
             columns.append({'x': line['x'], 'lines': [line]})
     return columns
 
-# def group_paragraphs(column_lines, gap_factor=1.5):
-#     column_lines.sort(key=lambda l: l['y'])
-#     if len(column_lines) < 2:
-#         return [column_lines] if column_lines else []
-#
-#     # Calculate dynamic average line height
-#     line_heights = [l['h'] for l in column_lines]
-#     avg_height = np.median(line_heights)
-#     para_gap_threshold = gap_factor * avg_height
-#
-#     paragraphs = []
-#     para = [column_lines[0]]
-#
-#     for i in range(1, len(column_lines)):
-#         prev = column_lines[i - 1]
-#         curr = column_lines[i]
-#         gap = curr['y'] - (prev['y'] + prev['h'])
-#
-#         if gap > para_gap_threshold:
-#             paragraphs.append(para)
-#             para = [curr]
-#         else:
-#             para.append(curr)
-#     if para:
-#         paragraphs.append(para)
-#
-#     return paragraphs
 
-def group_paragraphs(column_lines, gap_factor=1.5, merge_ratio=0.5):
-    """
-    Groups lines into paragraphs using dynamic spacing and line height.
-    """
+def group_paragraphs(column_lines: list, gap_factor: float = 1.5, merge_ratio: float = 0.5) -> list:
+    """Group lines into paragraphs using vertical spacing and overlap."""
     column_lines.sort(key=lambda l: l['y'])
     paragraphs = []
+
     if not column_lines:
         return paragraphs
 
     current_para = [column_lines[0]]
     prev_line = column_lines[0]
 
-    for i in range(1, len(column_lines)):
-        line = column_lines[i]
+    for line in column_lines[1:]:
         gap = line['y'] - (prev_line['y'] + prev_line['h'])
-
-        # Adaptive threshold based on previous line height
         height_thresh = gap_factor * np.mean([prev_line['h'], line['h']])
-
-        # Heuristic: merge if gap is small or overlap occurs
         if gap < height_thresh and gap >= -merge_ratio * line['h']:
             current_para.append(line)
         else:
             paragraphs.append(current_para)
             current_para = [line]
-
         prev_line = line
 
     if current_para:
@@ -101,24 +81,27 @@ def group_paragraphs(column_lines, gap_factor=1.5, merge_ratio=0.5):
 
     return paragraphs
 
-def draw_paragraph_boxes(image, paragraphs, color=(255, 0, 0), thickness=2):
+
+# --- Visualization ---
+
+def draw_paragraph_boxes(image: Image.Image, paragraphs: list, color=(255, 0, 0), thickness=2) -> np.ndarray:
+    """Draw rectangles around grouped paragraphs."""
     image_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     for para in paragraphs:
-        x_vals = [l['x'] for l in para]
-        y_vals = [l['y'] for l in para]
-        x_ends = [l['x'] + l['w'] for l in para]
-        y_ends = [l['y'] + l['h'] for l in para]
-        x_min, y_min = int(min(x_vals)), int(min(y_vals))
-        x_max, y_max = int(max(x_ends)), int(max(y_ends))
+        x_min = int(min(line['x'] for line in para))
+        y_min = int(min(line['y'] for line in para))
+        x_max = int(max(line['x'] + line['w'] for line in para))
+        y_max = int(max(line['y'] + line['h'] for line in para))
         cv2.rectangle(image_cv, (x_min, y_min), (x_max, y_max), color, thickness)
     return image_cv
 
-# Main pipeline
-def detect_paragraphs(image_path, column_thresh=30, gap_factor=1):
-    ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
-    image = load_image(image_path)
-    results = ocr.ocr(image_path, cls=True)[0]
 
+# --- Pipeline ---
+
+def detect_paragraphs(image_path: str, column_thresh: int = 50, gap_factor: float = 1.5, use_gpu: bool = False):
+    """Full pipeline to detect paragraphs and visualize them."""
+    image = load_image(image_path)
+    results = run_ocr(image_path, use_gpu=use_gpu)
     lines = extract_metadata(results)
     lines.sort(key=lambda l: l['y'])
 
@@ -126,8 +109,7 @@ def detect_paragraphs(image_path, column_thresh=30, gap_factor=1):
 
     all_paragraphs = []
     for col in columns:
-        paras = group_paragraphs(col['lines'], gap_factor=gap_factor)
-        all_paragraphs.extend(paras)
+        all_paragraphs.extend(group_paragraphs(col['lines'], gap_factor=gap_factor))
 
     image_with_boxes = draw_paragraph_boxes(image, all_paragraphs)
 
@@ -139,5 +121,7 @@ def detect_paragraphs(image_path, column_thresh=30, gap_factor=1):
 
     return all_paragraphs
 
-# Run
-paragraphs = detect_paragraphs('./sampleImages/5.png')
+
+# --- Run ---
+if __name__ == "__main__":
+    detect_paragraphs('./sampleImages/5.png', column_thresh=50, gap_factor=0.4, use_gpu=False)
