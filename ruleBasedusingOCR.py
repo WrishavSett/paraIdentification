@@ -114,7 +114,7 @@ def draw_paragraph_boxes(image, paragraphs, color=(255, 0, 0), thickness=2):
     return image_cv
 
 # Main pipeline
-def detect_paragraphs(image_path, column_thresh=30, gap_factor=10):
+def detect_paragraphs(image_path, column_thresh=30, gap_factor=1):
     ocr = PaddleOCR(use_angle_cls=True, lang='en', use_gpu=False)
     image = load_image(image_path)
     results = ocr.ocr(image_path, cls=True)[0]
