@@ -7,9 +7,33 @@ import numpy as np
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
 # Load and OCR the image
-image_path = './sampleImages/2.png'  # Replace with actual image path
+image_path = './sampleImages/test/correct (1).png'  # Replace with actual image path
 image = Image.open(image_path).convert('RGB')
 ocr_result = ocr.ocr(image_path, cls=True)
+
+# # Make metadata from OCR result
+# metadata_list = []
+# for line in ocr_result[0]:
+#     box = line[0]
+#     text = line[1][0]
+#     score = line[1][1]
+    
+#     x_coords = [point[0] for point in box]
+#     y_coords = [point[1] for point in box]
+#     x_min, x_max = min(x_coords), max(x_coords)
+#     y_min, y_max = min(y_coords), max(y_coords)
+
+#     metadata_list.append({
+#         'text': text,
+#         'x': x_min,
+#         'y': y_min,
+#         'w': x_max - x_min,
+#         'h': y_max - y_min
+#         # 'score': score
+#     })
+# print("\nMetadata List:")
+# for data in metadata_list:
+#     print("\t", data)
 
 # Extract valid line boxes
 line_boxes = [line[0] for line in ocr_result[0] if line[1][0].strip()]
