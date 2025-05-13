@@ -7,7 +7,7 @@ import numpy as np
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
 # Load and OCR the image
-image_path = './sampleImages/7.png'  # Replace with your actual image path
+image_path = './sampleImages/9.png'  # Replace with your actual image path
 image = Image.open(image_path).convert('RGB')
 ocr_result = ocr.ocr(image_path, cls=True)
 
