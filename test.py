@@ -7,89 +7,97 @@ import numpy as np
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
 
 # Load and OCR the image
-image_path = './sampleImages/test/correct (1).png'  # Replace with actual image path
+image_path = './sampleImages/7.png'  # Replace with your actual image path
 image = Image.open(image_path).convert('RGB')
 ocr_result = ocr.ocr(image_path, cls=True)
 
-# # Make metadata from OCR result
-# metadata_list = []
-# for line in ocr_result[0]:
-#     box = line[0]
-#     text = line[1][0]
-#     score = line[1][1]
-    
-#     x_coords = [point[0] for point in box]
-#     y_coords = [point[1] for point in box]
-#     x_min, x_max = min(x_coords), max(x_coords)
-#     y_min, y_max = min(y_coords), max(y_coords)
+# Build metadata list from OCR results
+metadata_list = []
+for line in ocr_result[0]:
+    box = line[0]                   # 4-point polygon
+    text = line[1][0].strip()
+    score = line[1][1]
 
-#     metadata_list.append({
-#         'text': text,
-#         'x': x_min,
-#         'y': y_min,
-#         'w': x_max - x_min,
-#         'h': y_max - y_min
-#         # 'score': score
-#     })
-# print("\nMetadata List:")
-# for data in metadata_list:
-#     print("\t", data)
+    if not text:  # Skip empty strings
+        continue
 
-# Extract valid line boxes
-line_boxes = [line[0] for line in ocr_result[0] if line[1][0].strip()]
+    x_coords = [point[0] for point in box]
+    y_coords = [point[1] for point in box]
+    x_min, x_max = min(x_coords), max(x_coords)
+    y_min, y_max = min(y_coords), max(y_coords)
 
-# Get Y-center and start-X for each line
-def get_center_y(box): return (box[0][1] + box[3][1]) / 2
-def get_start_x(box): return min(box[0][0], box[3][0])
+    metadata_list.append({
+        'text': text,
+        'box': box,                 # Keep the original box
+        'x': x_min,                 # Top-left x
+        'y': y_min,                 # Top-left y
+        'w': x_max - x_min,
+        'h': y_max - y_min,
+        'center_y': (box[0][1] + box[3][1]) / 2,
+        'start_x': min(box[0][0], box[3][0]),
+        'score': score
+    })
 
-lines_with_meta = [(box, get_center_y(box), get_start_x(box)) for box in line_boxes]
-lines_sorted = sorted(lines_with_meta, key=lambda x: x[1])  # sort by Y center
+# Debug print
+print("\nMetadata List:")
+for data in metadata_list:
+    print("\t", data)
 
-# Compute vertical gaps and dynamic threshold
-y_centers = [line[1] for line in lines_sorted]
+# Sort lines by Y-center (vertical position)
+lines_sorted = sorted(metadata_list, key=lambda x: x['center_y'])
+
+# Compute vertical gap threshold
+y_centers = [line['center_y'] for line in lines_sorted]
 vertical_gaps = [y2 - y1 for y1, y2 in zip(y_centers[:-1], y_centers[1:])]
-median_gap = np.median(vertical_gaps)
-vertical_thresh = median_gap * 1.3  # allow 30% extra spacing within paragraphs
+median_gap = np.median(vertical_gaps) if vertical_gaps else 0
+vertical_thresh = median_gap * 1.3  # allow 30% more spacing within paragraphs
 
-# Compute dynamic indent threshold using IQR
-start_xs = [line[2] for line in lines_sorted]
-q1, q3 = np.percentile(start_xs, [25, 75])
+# Compute indent threshold using IQR
+start_xs = [line['start_x'] for line in lines_sorted]
+q1, q3 = np.percentile(start_xs, [25, 75]) if len(start_xs) >= 4 else (min(start_xs), max(start_xs))
 iqr = q3 - q1
-indent_thresh = iqr * 1.5  # anything > 1.5*IQR rightward is considered an indent
+indent_thresh = iqr * 1.5  # lines with start_x > this compared to previous are considered indents
 
-# Group lines into paragraphs
+# Group into paragraphs
 paragraphs = []
-current_paragraph = [lines_sorted[0][0]]
-prev_y = lines_sorted[0][1]
-prev_x = lines_sorted[0][2]
+current_paragraph = [lines_sorted[0]]
+prev_y = lines_sorted[0]['center_y']
+prev_x = lines_sorted[0]['start_x']
 
 for i in range(1, len(lines_sorted)):
-    box, curr_y, curr_x = lines_sorted[i]
-    if abs(curr_y - prev_y) > vertical_thresh or (curr_x - prev_x) > indent_thresh:
+    curr = lines_sorted[i]
+    curr_y = curr['center_y']
+    curr_x = curr['start_x']
+
+    is_new_para = abs(curr_y - prev_y) > vertical_thresh or (curr_x - prev_x) > indent_thresh
+    if is_new_para:
         paragraphs.append(current_paragraph)
-        current_paragraph = [box]
+        current_paragraph = [curr]
     else:
-        current_paragraph.append(box)
+        current_paragraph.append(curr)
+
     prev_y, prev_x = curr_y, curr_x
 
-paragraphs.append(current_paragraph)
+paragraphs.append(current_paragraph)  # Don't forget last one
 
-# Merge paragraph boxes
-def merge_boxes(boxes):
-    xs = [pt[0] for box in boxes for pt in box]
-    ys = [pt[1] for box in boxes for pt in box]
+# Merge bounding boxes for paragraphs
+def merge_boxes(meta_list):
+    all_pts = [pt for meta in meta_list for pt in meta['box']]
+    xs = [pt[0] for pt in all_pts]
+    ys = [pt[1] for pt in all_pts]
     return [[min(xs), min(ys)], [max(xs), min(ys)],
             [max(xs), max(ys)], [min(xs), max(ys)]]
 
 paragraph_boxes = [merge_boxes(p) for p in paragraphs]
 
-# Draw paragraph bounding boxes
+# Draw paragraph bounding boxes on image
 draw = ImageDraw.Draw(image)
 for box in paragraph_boxes:
-    draw.polygon([tuple(pt) for pt in box], outline='blue', width=1)
+    draw.polygon([tuple(pt) for pt in box], outline='blue', width=2)
 
-# Show result
+# Show the image with paragraph boxes
 plt.figure(figsize=(10, 10))
 plt.imshow(image)
 plt.axis('off')
+plt.title("Detected Paragraphs")
 plt.show()
