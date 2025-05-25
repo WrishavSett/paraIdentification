@@ -146,7 +146,53 @@ for folder_num in range(1, 51):
         draw.polygon([tuple(pt) for pt in box], outline='blue', width=2)
 
     # Save image with UUID
-    unique_filename = f"{uuid.uuid4()}.png"
+    unique_filename = f"segment_{uuid.uuid4()}.png"
+    output_path = os.path.join(output_folder, unique_filename)
+    image.save(output_path)
+    print(f"Saved: {output_path}")
+
+    from collections import Counter
+
+    # ----------- Step 8: Compute Mode of Paragraph Start X -----------
+
+    # Extract starting x-coordinates of each paragraph box (left edge)
+    start_xs = [min(pt[0] for pt in box) for box in paragraph_boxes]
+
+    # Count frequencies and find mode
+    x_counts = Counter(start_xs)
+    most_common_x, _ = x_counts.most_common(1)[0]
+
+    # Draw vertical line at mode x
+    draw.line([(most_common_x, 0), (most_common_x, image.height)], fill='red', width=2)
+
+    # Save image with UUID
+    unique_filename = f"line_{uuid.uuid4()}.png"
+    output_path = os.path.join(output_folder, unique_filename)
+    image.save(output_path)
+    print(f"Saved: {output_path}")
+
+    # ----------- Step 9: Highlight Misaligned Paragraphs Based on X Alignment -----------
+
+    from collections import Counter
+
+    # Define threshold for misalignment (tweakable)
+    deviation_threshold = 25  # pixels
+
+    # Draw paragraph boxes in red or green
+    draw = ImageDraw.Draw(image)
+    for box in paragraph_boxes:
+        para_start_x = min(pt[0] for pt in box)
+        deviation = abs(para_start_x - most_common_x)
+        
+        # Choose color based on alignment
+        color = 'green' if deviation <= deviation_threshold else 'red'
+        draw.polygon([tuple(pt) for pt in box], outline=color, width=2)
+
+    # Draw the vertical alignment reference line
+    draw.line([(most_common_x, 0), (most_common_x, image.height)], fill='blue', width=2)
+
+    # Save image with UUID
+    unique_filename = f"align_{uuid.uuid4()}.png"
     output_path = os.path.join(output_folder, unique_filename)
     image.save(output_path)
     print(f"Saved: {output_path}")

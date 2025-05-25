@@ -6,7 +6,7 @@ from sklearn.cluster import DBSCAN
 
 # ----------- Step 1: OCR Initialization -----------
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
-image_path = './sampleImages/5.png'  # Replace as needed
+image_path = './sampleImages/1.png'  # Replace as needed
 image = Image.open(image_path).convert('RGB')
 ocr_result = ocr.ocr(image_path, cls=True)
 
