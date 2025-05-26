@@ -6,7 +6,7 @@ from sklearn.cluster import DBSCAN
 
 # ----------- Step 1: OCR Initialization -----------
 ocr = PaddleOCR(use_angle_cls=True, lang='en')
-image_path = './sampleImages/1.png'  # Replace as needed
+image_path = './sampleImages/image 1.png'  # Replace as needed
 image = Image.open(image_path).convert('RGB')
 ocr_result = ocr.ocr(image_path, cls=True)
 
@@ -56,14 +56,14 @@ def group_into_paragraphs(lines):
     y_centers = [line['center_y'] for line in lines_sorted]
     vertical_gaps = [y2 - y1 for y1, y2 in zip(y_centers[:-1], y_centers[1:])]
     median_gap = np.median(vertical_gaps) if vertical_gaps else 0
-    vertical_thresh = median_gap * 1.3
+    vertical_thresh = median_gap * 1.2
 
     # Compute indent threshold via IQR
     start_xs = [line['start_x'] for line in lines_sorted]
     if len(start_xs) >= 4:
         q1, q3 = np.percentile(start_xs, [25, 75])
         iqr = q3 - q1
-        indent_thresh = iqr * 1.5
+        indent_thresh = iqr * 1.4
     else:
         indent_thresh = 40  # fallback
 
